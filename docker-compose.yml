@@ -19,6 +19,11 @@ services:
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-local-demo-lift-lab-change-this-key}
       SEED_DEMO: ${SEED_DEMO:-true}
+      ARTIFACT_DIR: /artifacts
+      RUN_LEASE_SECONDS: ${RUN_LEASE_SECONDS:-30}
+      RUN_HEARTBEAT_SECONDS: ${RUN_HEARTBEAT_SECONDS:-10}
+      RUN_MAX_ATTEMPTS: ${RUN_MAX_ATTEMPTS:-3}
+      RUN_HEAL_INTERVAL_SECONDS: ${RUN_HEAL_INTERVAL_SECONDS:-30}
     ports: ["${BACKEND_PORT:-19200}:8000"]
     volumes: ["artifacts:/artifacts"]
     depends_on:
@@ -31,9 +36,10 @@ services:
       retries: 15
       start_period: 15s
   worker:
-    container_name: ${COMPOSE_PROJECT_NAME:-lift-lab}-worker
+    # 不固定容器名，便于 --scale worker=2 验证双进程并发接管。
     build: ./backend
     command: ["python", "-m", "src.worker"]
+    stop_grace_period: 20s
     environment: *backend-env
     volumes: ["artifacts:/artifacts"]
     depends_on:
@@ -41,7 +47,7 @@ services:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "python", "-c", "import pathlib,time; assert time.time()-float(pathlib.Path('/artifacts/heartbeat').read_text())<15"]
+      test: ["CMD", "python", "-c", "import pathlib,time; assert time.time()-float(pathlib.Path('/artifacts/heartbeat').read_text())<45"]
       interval: 10s
       timeout: 3s
       retries: 10
